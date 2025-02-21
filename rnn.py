@@ -62,10 +62,6 @@ class RNN(nn.Module):
         self.last_predictions = predictions.detach()
         return predictions
 
-
-model = RNN().to(device)
-print(model)
-
 # Utility functions
 
 
@@ -136,23 +132,49 @@ def test(data, model, loss_fn):
         f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
 
-# Loss function, optimizer and training
-loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+def rnn_cross_entropy_config():
+    model = RNN().to(device)
+    config = {}
+    config["model"] = model
+    config["loss_fn"] = nn.CrossEntropyLoss()
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    return config
 
+
+def rnn_mse_config():
+    model = RNN().to(device)
+    config = {}
+    config["model"] = model
+    config["loss_fn"] = nn.MSELoss()
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    return config
+
+
+# Loss function, optimizer and training
+configurations = {}
+configurations["rnn_cross_entropy"] = rnn_cross_entropy_config()
+configurations["rnn_mse"] = rnn_mse_config()
 should_train = load_model_path == None
 if load_model_path:
-    model.load_state_dict(torch.load(load_model_path, weights_only=True))
+    for name, config in configurations.items():
+        path_with_prefix = f"{name}{load_model_path}"
+        config["model"].load_state_dict(
+            torch.load(path_with_prefix, weights_only=True))
 else:
     epochs = 10000
     for t in range(epochs):
-        train(input_data, model, loss_fn, optimizer)
         if t % 100 == 0:
             print(f"Epoch {t+1}\n-------------------------------")
-            test(input_data, model, loss_fn)
+        for name, config in configurations.items():
+            train(input_data, config["model"],
+                  config["loss_fn"], config["optimizer"])
+            if t % 100 == 0:
+                print(f"Model: {name}")
+                test(input_data, config["model"], config["loss_fn"])
 
-        if save_model_path:
-            torch.save(model.state_dict(), save_model_path)
+            if save_model_path:
+                path_with_prefix = f"{name}{save_model_path}"
+                torch.save(config["model"].state_dict(), path_with_prefix)
 
 # Inference
 
@@ -181,16 +203,22 @@ class InferenceModel:
         return tokens[out_index.item()]
 
 
-print("\n--------- Inference start ---------")
-model.reset()
-inf_model = InferenceModel(model, False)
-story = ['Jane']
-for i in range(100):
-    story.append(inf_model(story[-1]))
+def run_inference(model):
+    print("\n--------- Story start ---------")
+    model.reset()
+    inf_model = InferenceModel(model, False)
+    story = ['Jane']
+    for i in range(100):
+        story.append(inf_model(story[-1]))
 
-for i in range(len(story)):
-    print(story[i], end='')
-    if i < len(story)-1 and story[i] != '\n' and story[i+1] != '.':
-        print(" ", end='')
+    for i in range(len(story)):
+        print(story[i], end='')
+        if i < len(story)-1 and story[i] != '\n' and story[i+1] != '.':
+            print(" ", end='')
 
-print("\n---------- Inference end ----------")
+    print("\n---------- Story end ----------")
+
+
+for name, config in configurations.items():
+    print(f"Starting inference on model: {name}")
+    run_inference(config["model"])
