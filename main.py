@@ -4,6 +4,8 @@ import copy
 import torch
 from torch import nn
 
+from rnn_model import RNN
+
 device = torch.accelerator.current_accelerator(
 ).type if torch.accelerator.is_available() else "cpu"
 print(f"Using {device} device")
@@ -39,28 +41,6 @@ input_data = [['Jane', 'saw', 'John', '.', '\n'],
               ['dog', 'saw', 'Jane', '.', '\n'],
               ['dog', 'saw', 'John', '.', '\n']]
 
-
-# Define model
-class RNN(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(len(tokens)*2, 24),
-            nn.ReLU(),
-            nn.Linear(24, len(tokens))
-        )
-        self.softmax = nn.Softmax(dim=0)
-        self.last_predictions = torch.zeros((len(tokens)), dtype=torch.float32)
-
-    def reset(self):
-        self.last_predictions = torch.zeros((len(tokens)), dtype=torch.float32)
-
-    def forward(self, x):
-        inp = torch.cat((x, self.last_predictions))
-        logits = self.linear_relu_stack(inp)
-        predictions = self.softmax(logits)
-        self.last_predictions = predictions.detach()
-        return predictions
 
 # Utility functions
 
@@ -133,7 +113,7 @@ def test(data, model, loss_fn):
 
 
 def rnn_cross_entropy_config():
-    model = RNN().to(device)
+    model = RNN(len(tokens)).to(device)
     config = {}
     config["model"] = model
     config["loss_fn"] = nn.CrossEntropyLoss()
@@ -142,7 +122,7 @@ def rnn_cross_entropy_config():
 
 
 def rnn_mse_config():
-    model = RNN().to(device)
+    model = RNN(len(tokens)).to(device)
     config = {}
     config["model"] = model
     config["loss_fn"] = nn.MSELoss()
@@ -204,7 +184,7 @@ class InferenceModel:
 
 
 def run_inference(model):
-    print("\n--------- Story start ---------")
+    print("--------- Story start ---------")
     model.reset()
     inf_model = InferenceModel(model, False)
     story = ['Jane']
@@ -220,5 +200,5 @@ def run_inference(model):
 
 
 for name, config in configurations.items():
-    print(f"Starting inference on model: {name}")
+    print(f"\n\nStarting inference on model: {name}\n")
     run_inference(config["model"])
