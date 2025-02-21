@@ -4,22 +4,28 @@ import copy
 import torch
 from torch import nn
 
-device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+device = torch.accelerator.current_accelerator(
+).type if torch.accelerator.is_available() else "cpu"
 print(f"Using {device} device")
 
 tokens = ['Jane', 'John', 'dog', 'saw', '.', '\n']
 token_to_index = {token: idx for idx, token in enumerate(tokens)}
 
 # Configuration - read from command line
+
+
 def parse_args():
     import argparse
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-l", "--load_model_path", type=str, default=None, help="A path from which to load the model. Will skip training phase if given.")
-    parser.add_argument("-s", "--save_model_path", type=str, default=None, help="A path to which save the model")
+    parser.add_argument("-l", "--load_model_path", type=str, default=None,
+                        help="A path from which to load the model. Will skip training phase if given.")
+    parser.add_argument("-s", "--save_model_path", type=str,
+                        default=None, help="A path to which save the model")
 
     return parser.parse_args()
+
 
 args = parse_args()
 load_model_path = args.load_model_path
@@ -27,14 +33,15 @@ save_model_path = args.save_model_path
 
 # Input
 input_data = [['Jane', 'saw', 'John', '.', '\n'],
-['Jane', 'saw', 'dog', '.', '\n'],
-['John', 'saw', 'Jane', '.', '\n'],
-['John', 'saw', 'dog', '.', '\n'],
-['dog', 'saw', 'Jane', '.', '\n'],
-['dog', 'saw', 'John', '.', '\n']]
+              ['Jane', 'saw', 'dog', '.', '\n'],
+              ['John', 'saw', 'Jane', '.', '\n'],
+              ['John', 'saw', 'dog', '.', '\n'],
+              ['dog', 'saw', 'Jane', '.', '\n'],
+              ['dog', 'saw', 'John', '.', '\n']]
+
 
 # Define model
-class NeuralNetwork(nn.Module):
+class RNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.linear_relu_stack = nn.Sequential(
@@ -45,10 +52,8 @@ class NeuralNetwork(nn.Module):
         self.softmax = nn.Softmax(dim=0)
         self.last_predictions = torch.zeros((len(tokens)), dtype=torch.float32)
 
-    
     def reset(self):
         self.last_predictions = torch.zeros((len(tokens)), dtype=torch.float32)
-
 
     def forward(self, x):
         inp = torch.cat((x, self.last_predictions))
@@ -57,10 +62,13 @@ class NeuralNetwork(nn.Module):
         self.last_predictions = predictions.detach()
         return predictions
 
-model = NeuralNetwork().to(device)
+
+model = RNN().to(device)
 print(model)
 
 # Utility functions
+
+
 def prepare_dataset(data):
     shuffled = copy.deepcopy(data)
     random.shuffle(shuffled)
@@ -68,16 +76,19 @@ def prepare_dataset(data):
     for sentence in shuffled:
         for word in sentence:
             tokens.append(word)
-    
+
     X = tokens[:-1]
     y = tokens[1:]
     return X, y
+
 
 def token_to_one_hot_tensor(token):
     index = token_to_index[token]
     return nn.functional.one_hot(torch.tensor(index), num_classes=len(tokens))
 
 # Train
+
+
 def train(data, model, loss_fn, optimizer):
     X_set, y_set = prepare_dataset(data)
     size = len(X_set)
@@ -97,10 +108,6 @@ def train(data, model, loss_fn, optimizer):
         optimizer.step()
         optimizer.zero_grad()
 
-        # if batch % 10 == 0:
-        #     loss, current = loss.item(), (batch + 1) * len(X)
-        #     print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-
 
 # Test
 def test(data, model, loss_fn):
@@ -113,7 +120,8 @@ def test(data, model, loss_fn):
         for batch in range(size):
             X = token_to_one_hot_tensor(X_set[batch])
             y = token_to_one_hot_tensor(y_set[batch])
-            X, y = X.to(device).to(torch.float32), y.to(device).to(torch.float32)
+            X, y = X.to(device).to(torch.float32), y.to(
+                device).to(torch.float32)
 
             # Compute prediction error
             pred = model(X)
@@ -124,7 +132,9 @@ def test(data, model, loss_fn):
     correct /= size
 
     # Maximum accuracy possible on the test set: (33% + 100% + 50% + 100% + 100%) / 5 = ~78%
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    print(
+        f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+
 
 # Loss function, optimizer and training
 loss_fn = nn.CrossEntropyLoss()
@@ -144,17 +154,17 @@ else:
         if save_model_path:
             torch.save(model.state_dict(), save_model_path)
 
-    
-
 # Inference
+
+
 class InferenceModel:
-    def __init__(self, model: NeuralNetwork, use_argmax: bool):
+    def __init__(self, model: RNN, use_argmax: bool):
         self.model = model
         model.eval()
-        
+
         # Use argmax on true, multinomial (random sample) on false
         self.use_argmax = use_argmax
-    
+
     def __call__(self, inp):
         # Process input (word to one-hot)
         X = token_to_one_hot_tensor(inp)
@@ -167,12 +177,8 @@ class InferenceModel:
             out_index = torch.argmax(pred)
         else:
             out_index = torch.multinomial(pred, num_samples=1)
-        
-        result = tokens[out_index.item()]
 
-        # print(result, pred.detach().numpy())
-
-        return result
+        return tokens[out_index.item()]
 
 
 print("\n--------- Inference start ---------")
