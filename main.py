@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 from rnn_model import RNN
+from lstm_model import LSTM
 
 device = torch.accelerator.current_accelerator(
 ).type if torch.accelerator.is_available() else "cpu"
@@ -130,10 +131,30 @@ def rnn_mse_config():
     return config
 
 
+def lstm_cross_entropy_config():
+    model = LSTM(len(tokens)).to(device)
+    config = {}
+    config["model"] = model
+    config["loss_fn"] = nn.CrossEntropyLoss()
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    return config
+
+
+def lstm_mse_config():
+    model = LSTM(len(tokens)).to(device)
+    config = {}
+    config["model"] = model
+    config["loss_fn"] = nn.MSELoss()
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    return config
+
+
 # Loss function, optimizer and training
 configurations = {}
 configurations["rnn_cross_entropy"] = rnn_cross_entropy_config()
 configurations["rnn_mse"] = rnn_mse_config()
+configurations["lstm_cross_entropy"] = lstm_cross_entropy_config()
+configurations["lstm_mse"] = lstm_mse_config()
 should_train = load_model_path == None
 if load_model_path:
     for name, config in configurations.items():
