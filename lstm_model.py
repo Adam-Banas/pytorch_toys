@@ -37,7 +37,8 @@ class LSTM(nn.Module):
         self.memory = torch.zeros((self.tokens_count), dtype=torch.float32)
 
     def detach(self):
-        pass
+        self.memory = self.memory.detach()
+        self.last_predictions = self.last_predictions.detach()
 
     def forward(self, x):
         inp = torch.cat((x, self.last_predictions))
@@ -56,15 +57,13 @@ class LSTM(nn.Module):
             activation + memory)
 
         # Update memory for the next iteration
-        # TODO: So if the memory is detached from the graph, how can the network learn what to remember?
-        #       I think a different approach is needed here.
-        self.memory = activation_with_memory.detach().clone()
+        self.memory = activation_with_memory.clone()
 
         # Select what part of memory should be returned
         selection = self.selecting_layer(inp)
-        logits = selection * activation
+        logits = selection * activation_with_memory
 
         # And go through softmax, to get probabilities
         predictions = self.softmax(logits)
-        self.last_predictions = predictions.detach()
+        self.last_predictions = predictions
         return predictions

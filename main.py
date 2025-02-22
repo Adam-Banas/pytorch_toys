@@ -76,6 +76,11 @@ def train(data, model, loss_fn, optimizer):
     size = len(X_set)
     model.train()
 
+    # Reset internal state (like memory)
+    model.reset()
+    # Detach from the previous computational graph, just a safety precaution in case it hasn't been done already
+    model.detach()
+
     # Run backpropagation every 10 steps
     steps_since_last_backprop = 0
     steps_between_backprops = 10
@@ -88,9 +93,9 @@ def train(data, model, loss_fn, optimizer):
         # Compute prediction error
         pred = model(X)
         if not loss:
-            loss = loss_fn(pred, y)  # TODO: Accumulate this loss over samples
+            loss = loss_fn(pred, y)
         else:
-            loss += loss_fn(pred, y)  # TODO: Accumulate this loss over samples
+            loss += loss_fn(pred, y)
 
         # Backpropagation
         steps_since_last_backprop += 1
@@ -161,7 +166,7 @@ def lstm_cross_entropy_config():
     config = {}
     config["model"] = model
     config["loss_fn"] = nn.CrossEntropyLoss()
-    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-2)
     return config
 
 
@@ -170,7 +175,7 @@ def lstm_mse_config():
     config = {}
     config["model"] = model
     config["loss_fn"] = nn.MSELoss()
-    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-2)
     return config
 
 
