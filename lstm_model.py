@@ -36,6 +36,9 @@ class LSTM(nn.Module):
             (self.tokens_count), dtype=torch.float32)
         self.memory = torch.zeros((self.tokens_count), dtype=torch.float32)
 
+    def detach(self):
+        pass
+
     def forward(self, x):
         inp = torch.cat((x, self.last_predictions))
 

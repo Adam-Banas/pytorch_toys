@@ -34,6 +34,7 @@ args = parse_args()
 load_model_path = args.load_model_path
 save_model_path = args.save_model_path
 
+
 # Input
 input_data = [['Jane', 'saw', 'John', '.', '\n'],
               ['Jane', 'saw', 'dog', '.', '\n'],
@@ -68,9 +69,17 @@ def token_to_one_hot_tensor(token):
 
 def train(data, model, loss_fn, optimizer):
     X_set, y_set = prepare_dataset(data)
+    # discard first 0 - 9 samples
+    to_discard = random.randint(0, 9)
+    X_set = X_set[to_discard:]
+    y_set = y_set[to_discard:]
     size = len(X_set)
     model.train()
 
+    # Run backpropagation every 10 steps
+    steps_since_last_backprop = 0
+    steps_between_backprops = 10
+    loss = None
     for batch in range(size):
         X = token_to_one_hot_tensor(X_set[batch])
         y = token_to_one_hot_tensor(y_set[batch])
@@ -78,12 +87,28 @@ def train(data, model, loss_fn, optimizer):
 
         # Compute prediction error
         pred = model(X)
-        loss = loss_fn(pred, y)
+        if not loss:
+            loss = loss_fn(pred, y)  # TODO: Accumulate this loss over samples
+        else:
+            loss += loss_fn(pred, y)  # TODO: Accumulate this loss over samples
 
         # Backpropagation
+        steps_since_last_backprop += 1
+        if (steps_since_last_backprop == steps_between_backprops):
+            steps_since_last_backprop = 0
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            model.detach()
+            loss = None
+
+    # Run backpropagation for the last samples
+    # Notice this can be less than standard 10
+    if steps_since_last_backprop != 0:
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
+        model.detach()
 
 
 # Test
@@ -118,7 +143,7 @@ def rnn_cross_entropy_config():
     config = {}
     config["model"] = model
     config["loss_fn"] = nn.CrossEntropyLoss()
-    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-2)
     return config
 
 
@@ -127,7 +152,7 @@ def rnn_mse_config():
     config = {}
     config["model"] = model
     config["loss_fn"] = nn.MSELoss()
-    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-3)
+    config["optimizer"] = torch.optim.SGD(model.parameters(), lr=1e-2)
     return config
 
 
@@ -152,9 +177,9 @@ def lstm_mse_config():
 # Loss function, optimizer and training
 configurations = {}
 configurations["rnn_cross_entropy"] = rnn_cross_entropy_config()
-configurations["rnn_mse"] = rnn_mse_config()
-configurations["lstm_cross_entropy"] = lstm_cross_entropy_config()
-configurations["lstm_mse"] = lstm_mse_config()
+# configurations["rnn_mse"] = rnn_mse_config()
+# configurations["lstm_cross_entropy"] = lstm_cross_entropy_config()
+# configurations["lstm_mse"] = lstm_mse_config()
 should_train = load_model_path == None
 if load_model_path:
     for name, config in configurations.items():
